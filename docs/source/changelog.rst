@@ -80,6 +80,13 @@ Changed
 Fixed
 ^^^^^
 
+- Fixed ``./scripts/run_docker.sh`` hard-failing on hosts without the
+  NVIDIA Container Toolkit. The script now auto-detects the toolkit and
+  only injects ``--runtime=nvidia --gpus all`` when it is available; on
+  hosts whose Docker engine is not ``linux/amd64`` (e.g. macOS on Apple
+  Silicon) it also pins ``--platform=linux/amd64`` so the existing uv
+  lockfile resolves. This makes the local Docker build usable for
+  CPU-only evaluation, including on macOS.
 - Fixed ``ContactSensor`` with ``global_frame=True`` and
   ``reduce`` ∈ {``"none"``, ``"mindist"``, ``"maxforce"``} producing forces
   rotated onto the wrong axis. The contact-frame→world rotation matrix had

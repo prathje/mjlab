@@ -192,12 +192,17 @@ Method 4 - Docker / clusters
 Prerequisites:
 
 - Install Docker: `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-- Install an appropriate NVIDIA driver for your system and the
+- For GPU training, install an appropriate NVIDIA driver for your system and the
   `NVIDIA Container Toolkit <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>`_.
 
   - Be sure to register the container runtime with Docker and restart,
     as described in the Docker configuration section of the NVIDIA
     install guide.
+
+  - The toolkit is only required for training. ``./scripts/run_docker.sh``
+    detects whether the toolkit is installed and only adds the GPU flags
+    when it is, so the same script works for CPU-only evaluation
+    (e.g. on macOS, where Docker Desktop has no NVIDIA passthrough).
 
 .. tab-set::
 
@@ -219,6 +224,12 @@ Prerequisites:
       .. code-block:: bash
 
          ./scripts/run_docker.sh uv run demo
+
+      On macOS (or any host whose Docker engine is not ``linux/amd64``),
+      the script forces ``--platform=linux/amd64`` so the existing uv
+      lockfile resolves. Builds and runs will use Rosetta/qemu emulation,
+      which is slow but sufficient for the demo and other evaluation
+      workloads. For training, use a Linux host with an NVIDIA GPU.
 
 
 Having some troubles?
