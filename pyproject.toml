@@ -49,6 +49,8 @@ dependencies = [
   "tensorboard>=2.20.0",
   "onnxscript>=0.5.4",
   "wandb>=0.22.3",
+  # Required by warp-lang's experimental Metal backend on Apple Silicon.
+  "mlx>=0.31.0; sys_platform == 'darwin'",
 ]
 
 [project.urls]
