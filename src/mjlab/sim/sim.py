@@ -565,7 +565,13 @@ class Simulation:
       sensor.raycast_kernel(rc=rc)
 
   def _should_use_cuda_graph(self) -> bool:
-    """Determine if CUDA graphs can be used based on device and driver version."""
+    """Determine if graph capture can be used based on device and driver version."""
+    if getattr(self.wp_device, "is_metal", False):
+      # Metal supports graph capture through indirect command buffers when
+      # the native dispatch backend is active. Replay skips Warp's entire
+      # per-launch Python path, which dominates step time on Apple GPUs.
+      return bool(wp.config.metal_native_dispatch)
+
     if not self.wp_device.is_cuda:
       return False
 
