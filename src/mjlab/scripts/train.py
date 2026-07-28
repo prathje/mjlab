@@ -49,7 +49,13 @@ class TrainConfig:
 def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
   cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
   if cuda_visible == "":
-    device = "cpu"
+    # Warp's Metal backend is opt-in via WARP_ENABLE_METAL=1 (the same
+    # flag warp reads as its config default); warp accepts "mps" as a
+    # device alias, so mjlab's device plumbing stays torch-flavored.
+    if sys.platform == "darwin" and os.environ.get("WARP_ENABLE_METAL") == "1":
+      device = "mps"
+    else:
+      device = "cpu"
     seed = cfg.agent.seed
     rank = 0
   else:
