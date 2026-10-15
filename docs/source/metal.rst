@@ -57,6 +57,10 @@ To work on MuJoCo Warp as well, replace the git install with a local checkout:
 
    uv pip install --python metal/.venv --no-deps -e ../mujoco_warp_metal
 
+Later syncs must skip the editable packages, or uv puts the git versions back:
+``uv sync --project metal --no-install-package warp-lang --no-install-package
+mujoco-warp``.
+
 Run commands with ``metal/.venv/bin/python``, or with
 ``uv run --project metal --no-sync``. A plain ``uv run`` re-syncs and would
 put the git versions back. Don't use ``uv run`` without ``--project metal``,
