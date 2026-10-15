@@ -17,6 +17,8 @@ choose the one that best fits your use case.
     - **Training**: Linux + NVIDIA GPU (Turing or newer) with driver 580+
       (or driver 525+ with the ``cu126`` extra, which does not support Blackwell GPUs)
     - **Evaluation**: Linux, macOS, or Windows (WSL)
+    - **Apple Silicon GPU**: experimental, through Metal forks of Warp and
+      MuJoCo Warp; see :ref:`metal`
     - **Python**: 3.10 or higher
 
     See :ref:`faq` for more details on what is exactly supported.

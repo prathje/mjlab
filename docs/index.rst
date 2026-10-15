@@ -43,6 +43,7 @@ Table of Contents
    :caption: User Guide
 
    source/installation
+   source/metal
    source/tutorials
    source/contributing
 
