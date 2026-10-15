@@ -8,9 +8,9 @@ Upcoming version (not yet released)
 Added
 ^^^^^
 
-- Added experimental Apple Silicon GPU support on macOS through Metal forks of
-  Warp and MuJoCo Warp, wired up with darwin-only dependency markers. Linux
-  dependencies are unchanged. See :ref:`metal`.
+- Added experimental, opt-in Apple Silicon GPU support on macOS through Metal
+  forks of Warp and MuJoCo Warp, installed from a separate ``metal/`` uv
+  project. Default installs are unchanged. See :ref:`metal`.
 - Added a ``cu126`` extra (``uv sync --extra cu126``) that installs torch built for
   CUDA 12.6, for machines whose NVIDIA driver is older than 580. It does not include
   kernels for Blackwell GPUs.
