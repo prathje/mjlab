@@ -23,11 +23,16 @@ def get_test_device() -> str:
   """Get device for testing, preferring CUDA if available.
 
   Can be overridden with FORCE_CPU=1 environment variable to test
-  CPU-only behavior on GPU machines.
+  CPU-only behavior on GPU machines. On macOS, WARP_ENABLE_METAL=1 selects
+  the Apple GPU ("mps") when CUDA is not available.
   """
   if os.environ.get("FORCE_CPU") == "1":
     return "cpu"
-  return "cuda" if torch.cuda.is_available() else "cpu"
+  if torch.cuda.is_available():
+    return "cuda"
+  if os.environ.get("WARP_ENABLE_METAL") == "1" and torch.backends.mps.is_available():
+    return "mps"
+  return "cpu"
 
 
 @pytest.fixture
