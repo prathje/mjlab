@@ -606,7 +606,7 @@ class Simulation:
       # Metal supports graph capture through indirect command buffers when
       # the native dispatch backend is active. Replay skips Warp's entire
       # per-launch Python path, which dominates step time on Apple GPUs.
-      return bool(wp.config.metal_native_dispatch)
+      return bool(getattr(wp.config, "metal_native_dispatch", False))
 
     if not self.wp_device.is_cuda:
       return False
