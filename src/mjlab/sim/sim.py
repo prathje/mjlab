@@ -371,6 +371,12 @@ class Simulation:
     self.sense_graph = None
     if self.use_cuda_graph:
       with _suspend_gc(), wp.ScopedDevice(self.wp_device):
+        if getattr(self.wp_device, "is_metal", False):
+          # MuJoCo Warp's Metal port builds some model-side index arrays on
+          # first use, with host-to-device copies that cannot be recorded in a
+          # graph. Run one eager forward() first; it does not advance state.
+          mjwarp.forward(self.wp_model, self.wp_data)
+          wp.synchronize_device(self.wp_device)
         with wp.ScopedCapture() as capture:
           mjwarp.step(self.wp_model, self.wp_data)
         self.step_graph = capture.graph
