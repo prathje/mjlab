@@ -469,7 +469,7 @@ class Simulation:
     if invalid_fields:
       raise ValueError(f"Fields not found in model: {invalid_fields}")
 
-    with self._torch_fence():
+    with self.torch_fence():
       expand_model_fields(self._wp_model, self.num_envs, list(fields))
     self._expanded_fields.update(fields)
     self._model_bridge.clear_cache()
@@ -509,18 +509,18 @@ class Simulation:
         is the cheapest (covers body_gravcomp changes).
     """
     fn = getattr(mjwarp, level.name)
-    with wp.ScopedDevice(self.wp_device), self._torch_fence():
+    with wp.ScopedDevice(self.wp_device), self.torch_fence():
       fn(self._wp_model, self._wp_data)
 
   def forward(self) -> None:
-    with wp.ScopedDevice(self.wp_device), self._torch_fence():
+    with wp.ScopedDevice(self.wp_device), self.torch_fence():
       if self.use_cuda_graph and self.forward_graph is not None:
         wp.capture_launch(self.forward_graph)
       else:
         mjwarp.forward(self.wp_model, self.wp_data)
 
   def step(self) -> None:
-    with wp.ScopedDevice(self.wp_device), self._torch_fence():
+    with wp.ScopedDevice(self.wp_device), self.torch_fence():
       with self.nan_guard.watch(self.data):
         if self.use_cuda_graph and self.step_graph is not None:
           wp.capture_launch(self.step_graph)
@@ -535,7 +535,7 @@ class Simulation:
         self._reset_mask.fill_(False)
         self._reset_mask[env_ids] = True
 
-      with self._torch_fence():
+      with self.torch_fence():
         if self.use_cuda_graph and self.reset_graph is not None:
           wp.capture_launch(self.reset_graph)
         else:
@@ -563,7 +563,7 @@ class Simulation:
     ctx = self._sensor_context
     ctx.prepare()
 
-    with wp.ScopedDevice(self.wp_device), self._torch_fence():
+    with wp.ScopedDevice(self.wp_device), self.torch_fence():
       if self.use_cuda_graph and self.sense_graph is not None:
         wp.capture_launch(self.sense_graph)
       else:
@@ -571,16 +571,19 @@ class Simulation:
 
     ctx.finalize()
 
-  # Private methods.
-
-  def _torch_fence(self) -> AbstractContextManager[None]:
+  def torch_fence(self) -> AbstractContextManager[None]:
     """Synchronize Torch and Warp around Warp launches on Metal; no-op elsewhere.
+
+    Code that launches Warp kernels on simulation arrays outside ``Simulation``
+    should wrap the launches in this context.
 
     CUDA and CPU keep their existing stream semantics unchanged.
     """
     if self._is_metal:
       return _metal_torch_fence(self.wp_device)
     return nullcontext()
+
+  # Private methods.
 
   def _sense_kernel(self) -> None:
     """GPU kernel sequence for sensing (captured in sense_graph)."""

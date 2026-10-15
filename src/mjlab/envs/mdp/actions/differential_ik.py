@@ -303,7 +303,8 @@ class DifferentialIKAction(ActionTerm):
 
   def _compute_jacobian(self) -> None:
     """Compute the frame Jacobian."""
-    with wp.ScopedDevice(self._env.sim.wp_device):
+    sim = self._env.sim
+    with wp.ScopedDevice(sim.wp_device), sim.torch_fence():
       mjwarp.jac(
         self._env.sim.wp_model,
         self._env.sim.wp_data,

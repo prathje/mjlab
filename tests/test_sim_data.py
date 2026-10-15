@@ -34,6 +34,9 @@ def test_torch_array_shares_memory(device):
     wp_arr = wp.array([1.0, 2.0], dtype=wp.float32)
   torch_arr = TorchArray(wp_arr)
   torch_arr[0] = 99.0
+  if torch_arr.device.type == "mps":
+    # Torch and Warp use separate Metal queues; drain Torch's before reading.
+    torch.mps.synchronize()
   assert wp_arr.numpy()[0] == 99.0
 
 
