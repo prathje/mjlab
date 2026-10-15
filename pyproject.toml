@@ -34,17 +34,11 @@ dependencies = [
   "prettytable",
   "tqdm",
   "tyro>=1.0.1",
-  "torch>=2.14.0; sys_platform != 'darwin'",
-  # macOS uses the Warp Metal fork, whose torch/MPS interop breaks on torch 2.14.
-  "torch~=2.11.0; sys_platform == 'darwin'",
+  "torch>=2.14.0",
   "torchrunx>=0.3.4",
   "warp-lang>=1.14.0",
-  "mujoco-warp~=3.11.0; sys_platform != 'darwin'",
-  "mujoco~=3.11.0; sys_platform != 'darwin'",
-  # macOS: Metal ports of Warp and MuJoCo Warp (see [tool.uv.sources] and
-  # docs/source/metal.rst). mujoco_warp metal-3.15 needs MuJoCo 3.15.
-  "mujoco-warp~=3.15.0; sys_platform == 'darwin'",
-  "mujoco~=3.15.0; sys_platform == 'darwin'",
+  "mujoco-warp~=3.11.0",
+  "mujoco~=3.11.0",
   "trimesh>=4.8.3",
   "scipy>=1.15",
   "viser>=1.0.27",
@@ -57,11 +51,6 @@ dependencies = [
   "tensorboard>=2.20.0",
   "onnxscript>=0.5.4",
   "wandb>=0.22.3",
-  # Runtime deps of Warp's Metal backend on Apple Silicon.
-  "mlx>=0.31.2,<0.32; sys_platform == 'darwin'",
-  "mlx-metal>=0.31.2,<0.32; sys_platform == 'darwin'",
-  "pyobjc-framework-metal>=12.1; sys_platform == 'darwin'",
-  "pyobjc-framework-cocoa>=12.1; sys_platform == 'darwin'",
 ]
 
 [project.urls]
@@ -103,9 +92,9 @@ docs = [
 ]
 
 [project.optional-dependencies]
-cu130 = ["torch>=2.14.0; sys_platform != 'darwin'"]
-cu126 = ["torch>=2.14.0; sys_platform != 'darwin'"]
-cpu = ["torch>=2.14.0; sys_platform != 'darwin'"]
+cu130 = ["torch>=2.14.0"]
+cu126 = ["torch>=2.14.0"]
+cpu = ["torch>=2.14.0"]
 
 [tool.uv]
 conflicts = [
@@ -119,22 +108,6 @@ required-environments = [
   "sys_platform == 'darwin' and platform_machine == 'arm64'",
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
-
-# Warp's setup.py needs a prebuilt native library to report its metadata, so a
-# git source cannot be locked from source. Declare the Metal fork's metadata
-# statically; installing it on macOS still requires a native build (see
-# docs/source/metal.rst).
-[[tool.uv.dependency-metadata]]
-name = "warp-lang"
-version = "1.18.0"
-requires-dist = ["numpy"]
-
-# Static metadata also keeps uv from applying the mujoco_warp fork's own
-# [tool.uv.sources] (which pins mujoco to the nightly index) to this project.
-[[tool.uv.dependency-metadata]]
-name = "mujoco-warp"
-version = "3.15.0"
-requires-dist = ["absl-py", "etils[epath]", "mujoco>=3.12.0", "numpy", "warp-lang>=1.15"]
 
 [[tool.uv.index]]
 url = "https://pypi.org/simple"
@@ -160,11 +133,7 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
-warp-lang = [
-  { index = "nvidia", marker = "sys_platform != 'darwin'" },
-  { git = "https://github.com/prathje/warp-metal", branch = "metal-integ", marker = "sys_platform == 'darwin'" },
-]
-mujoco-warp = { git = "https://github.com/prathje/mujoco_warp_metal", branch = "metal-3.15", marker = "sys_platform == 'darwin'" }
+warp-lang = { index = "nvidia", marker = "sys_platform != 'darwin'" }
 torch = [
   { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform != 'darwin'" },
   { index = "pytorch-cu126", extra = "cu126", marker = "sys_platform != 'darwin'" },

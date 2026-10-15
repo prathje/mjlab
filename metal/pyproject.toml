@@ -1,0 +1,57 @@
+# Opt-in environment for running mjlab on the Apple GPU (Metal), macOS only.
+#
+# mjlab's own pyproject.toml and uv.lock are unchanged; this separate project
+# installs mjlab (editable, from ..) together with Metal ports of Warp and
+# MuJoCo Warp and the versions they need. See docs/source/metal.rst.
+#
+#   uv sync --project metal --no-install-package warp-lang
+#   uv pip install --python metal/.venv --no-deps -e ../warp-metal
+
+[project]
+name = "mjlab-metal-env"
+version = "0.0.0"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+  "mjlab",
+  # Runtime dependencies of Warp's Metal backend.
+  "mlx>=0.31.2,<0.32",
+  "mlx-metal>=0.31.2,<0.32",
+  "pyobjc-framework-metal>=12.1",
+  "pyobjc-framework-cocoa>=12.1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=v9.0.3",
+  "ruff>=0.16.1",
+]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'darwin' and platform_machine == 'arm64'"]
+# Replace mjlab's pins with what the Metal forks need: mujoco_warp metal-3.15
+# needs MuJoCo 3.15, and Warp's Torch/MPS interop breaks on torch 2.14.
+override-dependencies = [
+  "torch~=2.11.0",
+  "warp-lang>=1.18.0",
+  "mujoco-warp~=3.15.0",
+  "mujoco~=3.15.0",
+]
+
+# Warp's setup.py needs a prebuilt native library to report metadata, so its
+# git source cannot be locked from source. Static metadata for mujoco-warp keeps
+# uv from applying the fork's own [tool.uv.sources] (nightly mujoco index).
+[[tool.uv.dependency-metadata]]
+name = "warp-lang"
+version = "1.18.0"
+requires-dist = ["numpy"]
+
+[[tool.uv.dependency-metadata]]
+name = "mujoco-warp"
+version = "3.15.0"
+requires-dist = ["absl-py", "etils[epath]", "mujoco>=3.12.0", "numpy", "warp-lang>=1.15"]
+
+[tool.uv.sources]
+mjlab = { path = "..", editable = true }
+warp-lang = { git = "https://github.com/prathje/warp-metal", branch = "metal-integ" }
+mujoco-warp = { git = "https://github.com/prathje/mujoco_warp_metal", branch = "metal-3.15" }
