@@ -32,6 +32,11 @@ from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.scene import Scene, SceneCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
 
+pytestmark = pytest.mark.skipif(
+  hasattr(mujoco, "mjtCtrlInput"),
+  reason="BuiltinDcMotorActuator targets the MuJoCo 3.11 <dcmotor> API",
+)
+
 ROBOT_XML = load_fixture_xml("floating_base_articulated")
 
 # Motor characterization used throughout (resolves to K=0.24, R=2.88).

@@ -426,6 +426,13 @@ class BuiltinDcMotorActuator(Actuator[BuiltinDcMotorActuatorCfg]):
   """MuJoCo native ``<dcmotor>``: one actuator per target."""
 
   def edit_spec(self, spec: mujoco.MjSpec, target_names: list[str]) -> None:
+    if hasattr(mujoco, "mjtCtrlInput"):
+      # Newer MuJoCo (used by the macOS Metal setup) replaced input_mode with
+      # a ctrlspec bitmask and moved the dcmotor gainprm/biasprm layout.
+      raise NotImplementedError(
+        "BuiltinDcMotorActuator targets the MuJoCo 3.11 <dcmotor> API; "
+        f"MuJoCo {mujoco.__version__} changed it."
+      )
     cfg = self.cfg
     motorconst, resistance, nominal = cfg.motor_params._pack()
     saturation = (
