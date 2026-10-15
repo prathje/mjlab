@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import gc
 import warnings
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Iterator, Literal, cast
 
 import mujoco
 import mujoco_warp as mjwarp
@@ -48,6 +48,21 @@ def _suspend_gc():
   finally:
     if enabled:
       gc.enable()
+
+
+@contextmanager
+def _metal_torch_fence(device: wp.Device) -> Iterator[None]:
+  """Order Torch MPS work and Warp Metal work around a block of Warp launches.
+
+  Torch (MPS) and Warp (Metal) encode on separate MTLCommandQueues with no
+  ordering between them, so Torch writes must be drained before Warp reads
+  them and Warp writes before Torch reads them.
+  """
+  torch.mps.synchronize()
+  try:
+    yield
+  finally:
+    wp.synchronize_device(device)
 
 
 _JACOBIAN_MAP = {
@@ -238,6 +253,7 @@ class Simulation:
     self.cfg = cfg
     self.device = device
     self.wp_device = wp.get_device(self.device)
+    self._is_metal = bool(getattr(self.wp_device, "is_metal", False))
     self.num_envs = num_envs
     self._default_model_fields: dict[str, torch.Tensor] = {}
     # Fields whose DR baseline is per-world (DR's `_select_default_values`
@@ -371,7 +387,7 @@ class Simulation:
     self.sense_graph = None
     if self.use_cuda_graph:
       with _suspend_gc(), wp.ScopedDevice(self.wp_device):
-        if getattr(self.wp_device, "is_metal", False):
+        if self._is_metal:
           # MuJoCo Warp's Metal port builds some model-side index arrays on
           # first use, with host-to-device copies that cannot be recorded in a
           # graph. Run one eager forward() first; it does not advance state.
@@ -453,7 +469,8 @@ class Simulation:
     if invalid_fields:
       raise ValueError(f"Fields not found in model: {invalid_fields}")
 
-    expand_model_fields(self._wp_model, self.num_envs, list(fields))
+    with self._torch_fence():
+      expand_model_fields(self._wp_model, self.num_envs, list(fields))
     self._expanded_fields.update(fields)
     self._model_bridge.clear_cache()
 
@@ -492,18 +509,18 @@ class Simulation:
         is the cheapest (covers body_gravcomp changes).
     """
     fn = getattr(mjwarp, level.name)
-    with wp.ScopedDevice(self.wp_device):
+    with wp.ScopedDevice(self.wp_device), self._torch_fence():
       fn(self._wp_model, self._wp_data)
 
   def forward(self) -> None:
-    with wp.ScopedDevice(self.wp_device):
+    with wp.ScopedDevice(self.wp_device), self._torch_fence():
       if self.use_cuda_graph and self.forward_graph is not None:
         wp.capture_launch(self.forward_graph)
       else:
         mjwarp.forward(self.wp_model, self.wp_data)
 
   def step(self) -> None:
-    with wp.ScopedDevice(self.wp_device):
+    with wp.ScopedDevice(self.wp_device), self._torch_fence():
       with self.nan_guard.watch(self.data):
         if self.use_cuda_graph and self.step_graph is not None:
           wp.capture_launch(self.step_graph)
@@ -518,10 +535,11 @@ class Simulation:
         self._reset_mask.fill_(False)
         self._reset_mask[env_ids] = True
 
-      if self.use_cuda_graph and self.reset_graph is not None:
-        wp.capture_launch(self.reset_graph)
-      else:
-        mjwarp.reset_data(self.wp_model, self.wp_data, reset=self._reset_mask_wp)
+      with self._torch_fence():
+        if self.use_cuda_graph and self.reset_graph is not None:
+          wp.capture_launch(self.reset_graph)
+        else:
+          mjwarp.reset_data(self.wp_model, self.wp_data, reset=self._reset_mask_wp)
 
   def set_sensor_context(self, ctx: SensorContext) -> None:
     """Wire a SensorContext for camera/raycast sensing.
@@ -545,7 +563,7 @@ class Simulation:
     ctx = self._sensor_context
     ctx.prepare()
 
-    with wp.ScopedDevice(self.wp_device):
+    with wp.ScopedDevice(self.wp_device), self._torch_fence():
       if self.use_cuda_graph and self.sense_graph is not None:
         wp.capture_launch(self.sense_graph)
       else:
@@ -554,6 +572,15 @@ class Simulation:
     ctx.finalize()
 
   # Private methods.
+
+  def _torch_fence(self) -> AbstractContextManager[None]:
+    """Synchronize Torch and Warp around Warp launches on Metal; no-op elsewhere.
+
+    CUDA and CPU keep their existing stream semantics unchanged.
+    """
+    if self._is_metal:
+      return _metal_torch_fence(self.wp_device)
+    return nullcontext()
 
   def _sense_kernel(self) -> None:
     """GPU kernel sequence for sensing (captured in sense_graph)."""
