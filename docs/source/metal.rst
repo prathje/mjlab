@@ -83,3 +83,17 @@ code paths are unchanged.
   before each Warp launch and Warp's queue after it, so Torch never reads
   stale simulation state.
 - ``TorchArray`` only sets up CUDA streams on CUDA devices.
+
+Code that launches Warp kernels on simulation arrays outside ``Simulation``
+should wrap them in ``sim.torch_fence()``, which is a no-op on CUDA and CPU.
+
+Known limitations
+-----------------
+
+- MuJoCo Warp's convex collision kernel (``ccd_kernel``, used for e.g. box and
+  mesh pairs) does not yet compile on Metal; models that need it fail with a
+  ``MetalCodegenError``. Cartpole and G1 velocity-flat do not need it.
+- Camera sensors fail on Metal (``wp.Texture2D`` is not supported yet).
+- ``BuiltinDcMotorActuator`` targets the MuJoCo 3.11 ``<dcmotor>`` API and
+  raises ``NotImplementedError`` on MuJoCo 3.15.
+- The Torch/Warp fences add a full queue drain per launch.
