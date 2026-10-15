@@ -520,12 +520,17 @@ class Simulation:
         mjwarp.forward(self.wp_model, self.wp_data)
 
   def step(self) -> None:
-    with wp.ScopedDevice(self.wp_device), self.torch_fence():
-      with self.nan_guard.watch(self.data):
-        if self.use_cuda_graph and self.step_graph is not None:
-          wp.capture_launch(self.step_graph)
-        else:
-          mjwarp.step(self.wp_model, self.wp_data)
+    # NanGuard's pre-step snapshot and post-step check are Torch ops, so they
+    # sit outside the Torch/Warp fence.
+    with (
+      wp.ScopedDevice(self.wp_device),
+      self.nan_guard.watch(self.data),
+      self.torch_fence(),
+    ):
+      if self.use_cuda_graph and self.step_graph is not None:
+        wp.capture_launch(self.step_graph)
+      else:
+        mjwarp.step(self.wp_model, self.wp_data)
 
   def reset(self, env_ids: torch.Tensor | None = None) -> None:
     with wp.ScopedDevice(self.wp_device):
