@@ -11,6 +11,8 @@ import mujoco_warp as mjwarp
 import torch
 import warp as wp
 
+from mjlab.utils.torch_warp import torch_fence
+
 if TYPE_CHECKING:
   from mjlab.sensor.camera_sensor import CameraSensor
   from mjlab.sensor.raycast_sensor import RayCastSensor
@@ -317,7 +319,8 @@ class SensorContext:
       enabled_geom_groups = sorted(raycast_geom_groups)
       cam_active = [False] * ncam
 
-    with wp.ScopedDevice(self.wp_device):
+    # Building the context launches Warp kernels (BVH build) on sim arrays.
+    with wp.ScopedDevice(self.wp_device), torch_fence(self.wp_device):
       self._ctx = mjwarp.create_render_context(
         mjm=mj_model,
         nworld=self._data.nworld,

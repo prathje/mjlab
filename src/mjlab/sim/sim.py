@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import gc
 import warnings
-from contextlib import AbstractContextManager, contextmanager, nullcontext
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator, Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import mujoco
 import mujoco_warp as mjwarp
@@ -16,6 +16,7 @@ from mjlab.managers.event_manager import RecomputeLevel
 from mjlab.sim.randomization import expand_model_fields
 from mjlab.sim.sim_data import TorchArray, WarpBridge
 from mjlab.utils.nan_guard import NanGuard, NanGuardCfg
+from mjlab.utils.torch_warp import torch_fence
 
 if TYPE_CHECKING:
   from mjlab.entity.variants import VariantMetadata
@@ -48,21 +49,6 @@ def _suspend_gc():
   finally:
     if enabled:
       gc.enable()
-
-
-@contextmanager
-def _metal_torch_fence(device: wp.Device) -> Iterator[None]:
-  """Order Torch MPS work and Warp Metal work around a block of Warp launches.
-
-  Torch (MPS) and Warp (Metal) encode on separate MTLCommandQueues with no
-  ordering between them, so Torch writes must be drained before Warp reads
-  them and Warp writes before Torch reads them.
-  """
-  torch.mps.synchronize()
-  try:
-    yield
-  finally:
-    wp.synchronize_device(device)
 
 
 _JACOBIAN_MAP = {
@@ -390,9 +376,10 @@ class Simulation:
         if self._is_metal:
           # MuJoCo Warp's Metal port builds some model-side index arrays on
           # first use, with host-to-device copies that cannot be recorded in a
-          # graph. Run one eager forward() first; it does not advance state.
-          mjwarp.forward(self.wp_model, self.wp_data)
-          wp.synchronize_device(self.wp_device)
+          # graph. Run one eager forward() before every capture; it does not
+          # advance state.
+          with self.torch_fence():
+            mjwarp.forward(self.wp_model, self.wp_data)
         with wp.ScopedCapture() as capture:
           mjwarp.step(self.wp_model, self.wp_data)
         self.step_graph = capture.graph
@@ -580,13 +567,10 @@ class Simulation:
     """Synchronize Torch and Warp around Warp launches on Metal; no-op elsewhere.
 
     Code that launches Warp kernels on simulation arrays outside ``Simulation``
-    should wrap the launches in this context.
-
-    CUDA and CPU keep their existing stream semantics unchanged.
+    should wrap the launches in this context. See
+    :func:`mjlab.utils.torch_warp.torch_fence`.
     """
-    if self._is_metal:
-      return _metal_torch_fence(self.wp_device)
-    return nullcontext()
+    return torch_fence(self.wp_device)
 
   # Private methods.
 
